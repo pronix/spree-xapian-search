@@ -1,0 +1,27 @@
+<% product_url = product %>
+<div class="product preview" id="product_<%= product.id %>">
+<table cellspacing="0" cellpadding="3">
+<tbody>
+  <tr>
+  <td>
+    <div style="height: 102px; text-align: center;">
+      <%= link_to mini_image(product), product_url %>
+    </div>
+  </td>
+  <td style="vertical-align:middle;">
+    [Match <%= product.search_percent %>%]
+    <br/>
+    <strong><%= link_to product.name, product_url %></strong>
+    <br/>
+    <div style="width: 10em;">
+      <%= render :partial => 'products/shortrating', :locals => {:product => product} %>
+    </div>
+    <div class="component_price">
+      Sale price: <%= product_price(product) %>
+    </div>
+  </td>
+  </tr>
+  </table>
+</div>
+
+
