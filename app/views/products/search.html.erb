@@ -14,11 +14,8 @@
   <% if @products.empty? %>
     <p>Sorry, your search returned no results</p>
   <% else %>
-    <% if @products.total_pages > 1 %>
-      <div class="pagination">
-        <%= paginating_links(@products) %>
-      </div>
-    <% end %>
+    <%= will_paginate @products, :params => {:q => params[:q]} %>
+    <br/>
 
     <div>
       <ul class="product-listing">
@@ -32,11 +29,7 @@
     </div>
     <div style="clear:both;"/>
     
-    <% if @products.total_pages > 1 %>
-      <div class="pagination">
-        <%= will_paginate @products %>
-      </div>
-    <% end %>
+    <%= will_paginate @products %>
   <% end %>
   
 <% else %>

@@ -8,8 +8,6 @@ class XapianSearchExtension < Spree::Extension
 
   def activate
 
-    ActionView::Base.send(:include, PaginatingFind::Helpers)    
-
     Product.class_eval do
       
       cattr_accessor :xapian_search_texts
@@ -51,7 +49,7 @@ class XapianSearchExtension < Spree::Extension
       
       def search
         if params[:q]
-          @products = Product.search(params[:q], :page => params[:page], :per_page => 3)
+          @products = Product.search(params[:q], :page => params[:page], :per_page => 10)
         end
       end
       
