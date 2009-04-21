@@ -50,7 +50,7 @@ class XapianSearchExtension < Spree::Extension
       
       def search
         if params[:q]
-          @products = Product.search(params[:q], :page => params[:page], :per_page => 3)
+          @products = Product.search(params[:q], :page => params[:page], :per_page => 10)
         end
       end
       
