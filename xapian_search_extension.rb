@@ -19,6 +19,11 @@ class XapianSearchExtension < Spree::Extension
       attr_accessor :search_percent
       attr_accessor :search_weight
 
+      # to be moved into spree some time
+      def is_active?(some_time = Time.zone.now)
+        deleted_at.nil? && available_on <= some_time
+      end 
+
       def self.search(query, options = {})
         options = {:per_page => 10}.update(options)
         options[:page] ||= 1
@@ -36,8 +41,9 @@ class XapianSearchExtension < Spree::Extension
           product
         end
                 
+        products = products.select(&:is_active?)
 
-        returning XapianResultEnumerator.new(options[:page], options[:per_page], total_matches) do |pager|
+        returning XapianResultEnumerator.new(options[:page], options[:per_page], products.count) do |pager|
           pager.xapian_search = xapian_search
           pager.replace products
         end
