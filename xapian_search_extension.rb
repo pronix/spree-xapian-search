@@ -6,6 +6,10 @@ class XapianSearchExtension < Spree::Extension
   description "Full text product search for Spree using acts_as_xapian"
   url "http://github.com/davidnorth/spree-xapian-search"
 
+  def self.require_gems(config)
+    config.gem "will_paginate"
+  end
+  
   def activate
 
     Product.class_eval do
