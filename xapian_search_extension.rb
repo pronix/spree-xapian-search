@@ -47,7 +47,7 @@ class XapianSearchExtension < Spree::Extension
                 
         products = products.select(&:is_active?)
 
-        returning XapianResultEnumerator.new(options[:page], options[:per_page], products.count) do |pager|
+        returning XapianResultEnumerator.new(options[:page], options[:per_page], total_matches) do |pager|
           pager.xapian_search = xapian_search
           pager.replace products
         end
@@ -57,10 +57,13 @@ class XapianSearchExtension < Spree::Extension
     end
 
     ProductsController.class_eval do
-      
+     
+      @@excluded = %w[ an the a with on in to ]
+ 
       def search
         if params[:q]
-          @products = Product.search(params[:q], :page => params[:page], :per_page => 10)
+          query = params[:q].map {|w| @@excluded.include?(w) ? w : w + '*' }.join(' ')
+          @products = Product.search(query, :page => params[:page], :per_page => 10)
         end
       end
       
