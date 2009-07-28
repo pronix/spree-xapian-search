@@ -28,7 +28,7 @@ class XapianSearchExtension < Spree::Extension
         deleted_at.nil? && available_on <= some_time
       end 
 
-      def self.search(query, options = {})
+      def self.xsearch(query, options = {})
         options = {:per_page => 10}.update(options)
         options[:page] ||= 1
         
@@ -63,7 +63,7 @@ class XapianSearchExtension < Spree::Extension
       def search
         if params[:q]
           query = params[:q].map {|w| @@excluded.include?(w) ? w : w + '*' }.join(' ')
-          @products = Product.search(query, :page => params[:page], :per_page => 10)
+          @products = Product.xsearch(query, :page => params[:page], :per_page => 10)
         end
       end
       
