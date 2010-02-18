@@ -9,13 +9,13 @@ class XapianSearchExtension < Spree::Extension
   def self.require_gems(config)
     config.gem "will_paginate"
   end
-  
+
   def activate
 
     Product.class_eval do
 
       acts_as_xapian :texts => [:name, :description, :meta_keywords, :meta_description, :extra_search_texts]
-      
+
       def extra_search_texts
         ''
       end
@@ -26,15 +26,15 @@ class XapianSearchExtension < Spree::Extension
       # to be moved into spree some time
       def is_active?(some_time = Time.zone.now)
         deleted_at.nil? && available_on <= some_time
-      end 
+      end
 
       def self.xsearch(query, options = {})
         options = {:per_page => 10}.update(options)
         options[:page] ||= 1
-        
+
         total_matches = ActsAsXapian::Search.new([Product], query, :limit => options[:per_page]).matches_estimated
         total_pages = (total_matches / options[:per_page].to_f).ceil
-        
+
         offset = options[:per_page] * (options[:page].to_i - 1)
         xapian_search = ActsAsXapian::Search.new([Product], query, :limit => options[:per_page], :offset => offset)
 
@@ -44,7 +44,7 @@ class XapianSearchExtension < Spree::Extension
           product.search_weight = result[:weight]
           product
         end
-                
+
         products = products.select(&:is_active?)
 
         returning XapianResultEnumerator.new(options[:page], options[:per_page], total_matches) do |pager|
@@ -53,21 +53,21 @@ class XapianSearchExtension < Spree::Extension
         end
 
       end
-      
+
     end
 
     ProductsController.class_eval do
-     
+
       @@excluded = %w[ an the a with on in to ]
- 
+
       def search
         if params[:q]
           query = params[:q].map {|w| @@excluded.include?(w) ? w : w + '*' }.join(' ')
           @products = Product.xsearch(query, :page => params[:page], :per_page => 10)
         end
       end
-      
+
     end
-    
+
   end
 end
