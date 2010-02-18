@@ -1,3 +1,4 @@
+# encoding: utf-8
 # acts_as_xapian/lib/acts_as_xapian.rb:
 # Xapian full text search in Ruby on Rails.
 #
@@ -102,7 +103,7 @@ module ActsAsXapian
 
       # make some things that don't depend on the db
       # XXX this gets made once for each acts_as_xapian. Oh well.
-      @@stemmer = Xapian::Stem.new('english')
+      @@stemmer = Xapian::Stem.new(config['lang'] || 'english')
     end
 
     # Opens / reopens the db for reading
@@ -199,22 +200,23 @@ module ActsAsXapian
         raise NoXapianRubyBindingsError.new("Xapian Ruby bindings not installed") unless ActsAsXapian.bindings_available
         raise "acts_as_xapian hasn't been called in any models" if @@init_values.empty?
 
-        # if DB is not nil, then we're already initialised, so don't do it again
-        return unless @@writable_db.nil?
+        # if DB is not nil, then we're already initialised, so don't do it
+        # again XXX reopen it each time, xapian_spec.rb needs this so database
+        # gets written twice correctly.
+        # return unless @@writable_db.nil?
         
         prepare_environment
 
-        new_path = @@db_path + suffix
+        full_path = @@db_path + suffix
         raise "writable_suffix/suffix inconsistency" if @@writable_suffix && @@writable_suffix != suffix
-        if @@writable_db.nil?
-            # for indexing
-            @@writable_db = Xapian::WritableDatabase.new(new_path, Xapian::DB_CREATE_OR_OPEN)
-            @@term_generator = Xapian::TermGenerator.new()
-            @@term_generator.set_flags(Xapian::TermGenerator::FLAG_SPELLING, 0)
-            @@term_generator.database = @@writable_db
-            @@term_generator.stemmer = @@stemmer
-            @@writable_suffix = suffix
-        end
+
+        # for indexing
+        @@writable_db = Xapian::WritableDatabase.new(full_path, Xapian::DB_CREATE_OR_OPEN)
+        @@term_generator = Xapian::TermGenerator.new()
+        @@term_generator.set_flags(Xapian::TermGenerator::FLAG_SPELLING, 0)
+        @@term_generator.database = @@writable_db
+        @@term_generator.stemmer = @@stemmer
+        @@writable_suffix = suffix
     end
 
     ######################################################################
@@ -353,8 +355,16 @@ module ActsAsXapian
             end
             # now get them in right order again
             results = []
-            docs.each{|doc| k = doc[:data].split('-'); results << { :model => chash[[k[0], k[1].to_i]],
-                    :percent => doc[:percent], :weight => doc[:weight], :collapse_count => doc[:collapse_count] } }
+            docs.each do |doc| 
+                k = doc[:data].split('-')
+                model_instance = chash[[k[0], k[1].to_i]]
+                if model_instance
+                    results << { :model => model_instance,
+                                 :percent => doc[:percent], 
+                                 :weight => doc[:weight], 
+                                 :collapse_count => doc[:collapse_count] }     
+                end
+            end
             self.cached_results = results
             return results
         end
@@ -379,7 +389,7 @@ module ActsAsXapian
             # Check parameters, convert to actual array of model classes
             new_model_classes = []
             model_classes = [model_classes] if model_classes.class != Array
-            for model_class in model_classes:
+            for model_class in model_classes
                 raise "pass in the model class itself, or a string containing its name" if model_class.class != Class && model_class.class != String
                 model_class = model_class.constantize if model_class.class == String
                 new_model_classes.push(model_class)
@@ -408,7 +418,7 @@ module ActsAsXapian
         # date ranges or similar. Use this for cheap highlighting with
         # TextHelper::highlight, and excerpt.
         def words_to_highlight
-            query_nopunc = self.query_string.gsub(/[^a-z0-9:\.\/_]/i, " ")
+            query_nopunc = self.query_string.gsub(/[^А-яa-z0-9:\.\/_]/i, " ")
             query_nopunc = query_nopunc.gsub(/\s+/, " ")
             words = query_nopunc.split(" ")
             # Remove anything with a :, . or / in it
@@ -500,7 +510,7 @@ module ActsAsXapian
     # logging in the database that it has been.
     def ActsAsXapian.update_index(flush = false, verbose = false)
         # STDOUT.puts("start of ActsAsXapian.update_index") if verbose
-
+        
         # Before calling writable_init we have to make sure every model class has been initialized.
         # i.e. has had its class code loaded, so acts_as_xapian has been called inside it, and
         # we have the info from acts_as_xapian.
@@ -509,6 +519,12 @@ module ActsAsXapian
         return if model_classes.size == 0
 
         ActsAsXapian.writable_init
+
+        # Abort if full rebuild is going on
+        new_path = ActsAsXapian.db_path + ".new"
+        if File.exist?(new_path)
+            raise "aborting incremental index update while full index rebuild happens; found existing " + new_path
+        end
 
         ids_to_refresh = ActsAsXapianJob.find(:all).map() { |i| i.id }
         for id in ids_to_refresh
@@ -525,7 +541,7 @@ module ActsAsXapian
                         STDOUT.puts("job with #{id} vanished under foot") if verbose
                         next
                     end
-                    STDOUT.puts("ActsAsXapian.update_index #{job.action} #{job.model} #{job.model_id.to_s}") if verbose
+                    STDOUT.puts("ActsAsXapian.update_index #{job.action} #{job.model} #{job.model_id.to_s} #{Time.now.to_s}") if verbose
                     begin
                         if job.action == 'update'
                             # XXX Index functions may reference other models, so we could eager load here too?
@@ -557,8 +573,12 @@ module ActsAsXapian
         end
     end
         
-    # You must specify *all* the models here, this totally rebuilds the Xapian database.
-    # You'll want any readers to reopen the database after this.
+    # You must specify *all* the models here, this totally rebuilds the Xapian
+    # database.  You'll want any readers to reopen the database after this.
+    #
+    # Incremental update_index calls above are suspended while this rebuild
+    # happens (i.e. while the .new database is there) - any index update jobs
+    # are left in the database, and will run after the rebuild has finished.
     def ActsAsXapian.rebuild_index(model_classes, verbose = false)
         raise "when rebuilding all, please call as first and only thing done in process / task" if not ActsAsXapian.writable_db.nil?
 
@@ -573,12 +593,6 @@ module ActsAsXapian
         ActsAsXapian.writable_init(".new")
 
         # Index everything 
-        # XXX not a good place to do this destroy, as unindexed list is lost if
-        # process is aborted and old database carries on being used. Perhaps do in
-        # transaction and commit after rename below? Not sure if thenlocking is then bad
-        # for live website running at same time.
-        
-        ActsAsXapianJob.destroy_all 
         batch_size = 1000
         for model_class in model_classes
           model_class.transaction do
@@ -703,6 +717,13 @@ module ActsAsXapian
                 job.save!
             end
         end
+        
+        # Allow reindexing to be skipped if a flag is set
+        def xapian_mark_needs_index_if_reindex
+            return true if (self.respond_to?(:no_xapian_reindex) && self.no_xapian_reindex == true)
+            xapian_mark_needs_index
+        end
+        
         def xapian_mark_needs_destroy
             model = self.class.base_class.to_s
             model_id = self.id
@@ -735,7 +756,7 @@ module ActsAsXapian
 
             ActsAsXapian.init(self.class.to_s, options)
 
-            after_save :xapian_mark_needs_index
+            after_save :xapian_mark_needs_index_if_reindex
             after_destroy :xapian_mark_needs_destroy
         end
     end
