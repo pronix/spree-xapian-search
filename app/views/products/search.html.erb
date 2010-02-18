@@ -18,14 +18,8 @@
     <br/>
 
     <div>
-      <ul class="product-listing">
-      <% for product in @products %>
-        <li class="product preview" style="width: 40%">
 		<%# cycle('normal', 'alternate') %>
-          <%= render :partial => 'search_result', :locals => {:product => product} %>
-        </li>
-      <% end %>
-      </ul>
+          <%= render :partial => 'search_result'%>
     </div>
     <div style="clear:both;"/>
     

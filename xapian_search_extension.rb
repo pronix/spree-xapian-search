@@ -2,9 +2,9 @@
 # require_dependency 'application'
 
 class XapianSearchExtension < Spree::Extension
-  version "1.0"
+  version "1.1"
   description "Full text product search for Spree using acts_as_xapian"
-  url "http://github.com/davidnorth/spree-xapian-search"
+  url "http://github.com/pronix/spree-xapian-search"
 
   def self.require_gems(config)
     config.gem "will_paginate"
@@ -62,7 +62,7 @@ class XapianSearchExtension < Spree::Extension
 
       def search
         if params[:q]
-          query = params[:q].map {|w| @@excluded.include?(w) ? w : w + '*' }.join(' ')
+          query = params[:q].split(' ').map {|w| @@excluded.include?(w) ? w : w + '*' }.join(' ')
           @products = Product.xsearch(query, :page => params[:page], :per_page => 10)
         end
       end
