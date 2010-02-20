@@ -1,10 +1,4 @@
-<% # @taxons = @taxon && @taxon.parent ? @taxon.parent.children : Taxon.roots  %> 
 <% form_tag search_path, :method => 'get' do %>
-  <% #FIXME необходимо расширить поиск по категориям и прочим параметрам%>
-  <%#= select_tag :taxon, 
-        options_for_select([[t(:all_departments), '']] + 
-                              @taxons.map {|t| [t.name, t.id]}, 
-                            @taxon ? @taxon.id : params[:taxon]) %>
   <%= text_field_tag :q, params[:q] %>
   <input type="submit" value="Search">
 <% end %>
